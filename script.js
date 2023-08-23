@@ -11,11 +11,52 @@ const inputDuration = document.querySelector('.form__input--duration');
 const inputCadence = document.querySelector('.form__input--cadence');
 const inputElevation = document.querySelector('.form__input--elevation');
 
-// let map, mapEvent;
+class Workout {
+  date = new Date();
+  id = (Date.now() + '').slice(-10);
+  constructor(coords, distance, duration) {
+    this.coords = coords;
+    this.distance = distance; // km
+    this.duration = duration; // min
+  }
+}
 
+class Running extends Workout {
+  type = 'running';
+  constructor(coords, distance, duration, cadence) {
+    super(coords, distance, duration);
+    this.cadence = cadence;
+    this.calcPace();
+  }
+
+  calcPace() {
+    // min/km
+    this.pace = this.duration / this.distance;
+    return this.pace;
+  }
+}
+
+class Cycling extends Workout {
+  type = 'cycling';
+  constructor(coords, distance, duration, elevationGain) {
+    super(coords, distance, duration, elevationGain);
+    this.elevationGain = elevationGain;
+    this.calcSpeed();
+  }
+
+  calcSpeed() {
+    // min/h
+    this.speed = this.distance / (this.duration / 60);
+    return this.speed;
+  }
+}
+
+////////////////////////////////////////////////
+// APPLICATION ARCHITECTURE
 class App {
   #map;
   #mapEvent;
+  #workouts = [];
   constructor() {
     this._getPosition();
     form.addEventListener('submit', this._newWorkout.bind(this));
@@ -60,9 +101,57 @@ class App {
 
   _newWorkout(e) {
     e.preventDefault();
-    form.reset();
+
+    const validInputs = (...inputs) =>
+      inputs.every(inp => Number.isFinite(inp));
+    const allPositive = (...inputs) => inputs.every(inp => inp > 0);
+
+    // Get Data from the form
+    const type = inputType.value;
+    const distance = +inputDistance.value;
+    const duration = +inputDistance.value;
     const { lat, lng } = this.#mapEvent.latlng;
-    L.marker([lat, lng])
+    let workout;
+
+    // If workout is running, create running object
+    if (type === 'running') {
+      const cadence = +inputCadence.value;
+      // Validating Inputs
+      if (
+        !validInputs(distance, duration, cadence) ||
+        !allPositive(distance, duration, cadence)
+      )
+        return alert('Inputs must be positive numbers');
+
+      workout = new Running([lat, lng], distance, duration, cadence);
+    }
+    // If workout is cycling, create cycling object
+    if (type === 'cycling') {
+      const elevation = +inputElevation.value;
+      // Validating Inputs
+      if (
+        !validInputs(distance, duration, elevation) ||
+        !allPositive(distance, duration)
+      )
+        return alert('Inputs must be positive numbers');
+
+      workout = new Cycling([lat, lng], distance, duration, elevation);
+    }
+    // Add new object to workout array
+    this.#workouts.push(workout);
+    console.log(workout);
+
+    // Render Workout as a Marker on Map
+    this._renderWorkoutMarker(workout);
+
+    // Render workout on list
+
+    // Hide form and clear inputs
+    form.reset();
+  }
+
+  _renderWorkoutMarker(workout) {
+    L.marker(workout.coords)
       .addTo(this.#map)
       .bindPopup(
         L.popup({
@@ -70,42 +159,12 @@ class App {
           minWidth: 100,
           autoClose: false,
           closeOnClick: false,
-          className: `${inputType.value}-popup`,
+          className: `${workout.type}-popup`,
         })
       )
-      .setPopupContent(`${inputType.value.toUpperCase()} at ${new Date()}`)
+      .setPopupContent(`workout`)
       .openPopup();
-    form.classList.add('hidden');
   }
 }
 
 const app = new App();
-
-/*
-form.addEventListener('submit', function (e) {
-  e.preventDefault();
-  form.reset();
-  const { lat, lng } = mapEvent.latlng;
-  L.marker([lat, lng])
-    .addTo(map)
-    .bindPopup(
-      L.popup({
-        maxWidth: 250,
-        minWidth: 100,
-        autoClose: false,
-        closeOnClick: false,
-        className: `${inputType.value}-popup`,
-      })
-    )
-    .setPopupContent(`${inputType.value.toUpperCase()} at ${new Date()}`)
-    .openPopup();
-  this.classList.add('hidden');
-});
-*/
-
-/*
-inputType.addEventListener('change', function () {
-  inputCadence.closest('.form__row').classList.toggle('form__row--hidden');
-  inputElevation.closest('.form__row').classList.toggle('form__row--hidden');
-});
-*/
